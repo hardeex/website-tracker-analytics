@@ -28,7 +28,7 @@ Perfect for developers, agencies, and businesses managing websites like:
 
 ---
 
-## 🔍 Overview
+## Overview
 The Analytics API tracks and stores real-time usage data across your websites.
 
 ### Metrics Tracked:
@@ -41,21 +41,21 @@ All data is associated with a specific registered website and securely tied to a
 
 ---
 
-## ✨ Features
-- ✅ **Multi-site Support** – Monitor analytics across many domains
-- 🔐 **JWT Authentication** – Secure API access with email verification
-- 📊 **Custom Metrics** – Track exactly what matters (page views, clicks, sessions)
-- 🌍 **Visitor Location Tracking** – Powered by MaxMind GeoLite2
-- 🚀 **Scalable** – Built with Laravel, Redis queues, and database indexing
-- 📦 **No External Dependencies** – You own the data; no Google, no tracking leaks
-- 👥 **Admin View** – Aggregate analytics from all websites
-- ⚖️ **GDPR/CCPA-Ready** – Consent management support
+##  Features
+- **Multi-site Support** – Monitor analytics across many domains
+-  **JWT Authentication** – Secure API access with email verification
+-  **Custom Metrics** – Track exactly what matters (page views, clicks, sessions)
+-  **Visitor Location Tracking** – Powered by MaxMind GeoLite2
+-  **Scalable** – Built with Laravel, Redis queues, and database indexing
+-  **No External Dependencies** – You own the data; no Google, no tracking leaks
+-  **Admin View** – Aggregate analytics from all websites
+-  **GDPR/CCPA-Ready** – Consent management support
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
-### ✅ Prerequisites
+###  Prerequisites
 - Access to your website’s code (HTML/JavaScript)
 - Text editor (e.g. VS Code)
 - A modern browser (Chrome, Firefox)
@@ -63,7 +63,7 @@ All data is associated with a specific registered website and securely tied to a
 
 ---
 
-### 🔐 Step 1: Register an Account
+###  Step 1: Register an Account
 
 ```bash
 curl -X POST https://analytics.essentialnews.ng/api/register \
@@ -92,14 +92,14 @@ GET https://analytics.essentialnews.ng/api/verify-email?token=YOUR_VERIFICATION_
 ```
 ✅ Save the `token` — it's your **API key** for all authenticated requests.
 
-### 🔁 Resend Verification Email
+###  Resend Verification Email
 ```bash
 curl -X POST https://analytics.essentialnews.ng/api/resend-verification \
   -H "Content-Type: application/json" \
   -d '{"email": "your.email@example.com"}'
 ```
 
-### 🔐 Log In to Refresh Token
+###  Log In to Refresh Token
 ```bash
 curl -X POST https://analytics.essentialnews.ng/api/login \
   -H "Content-Type: application/json" \
@@ -119,7 +119,7 @@ curl -X POST https://analytics.essentialnews.ng/api/login \
 
 ---
 
-### 🌐 Step 2: Register Your Website
+###  Step 2: Register Your Website
 
 ```bash
 curl -X POST https://analytics.essentialnews.ng/api/sites \
@@ -131,7 +131,7 @@ curl -X POST https://analytics.essentialnews.ng/api/sites \
 }'
 ```
 
-📌 Response:
+ Response:
 ```json
 {
   "site": {
@@ -145,7 +145,7 @@ curl -X POST https://analytics.essentialnews.ng/api/sites \
 
 ---
 
-### 📈 Step 3: Add the Tracking Script
+###  Step 3: Add the Tracking Script
 
 #### Option 1: Use Hosted Script
 ```html
@@ -219,11 +219,11 @@ Track clicks:
 <a href="/buy" data-track-id="buy-link">Buy Now</a>
 ```
 
-✅ Open browser > DevTools > Network tab and look for POST requests to `/api/track/pageview` or `/api/track/click`.
+ Open browser > DevTools > Network tab and look for POST requests to `/api/track/pageview` or `/api/track/click`.
 
 ---
 
-### 📊 Step 4: Retrieve Analytics Data
+###  Step 4: Retrieve Analytics Data
 
 ```bash
 curl -X GET https://analytics.essentialnews.ng/api/analytics/pageviews \
@@ -234,7 +234,7 @@ curl -X GET https://analytics.essentialnews.ng/api/analytics/pageviews \
 
 ## ⚙️ API Endpoints
 
-### 🔐 Authentication Routes
+###  Authentication Routes
 | Method | Endpoint                     | Description                            | Middleware    |
 |--------|------------------------------|----------------------------------------|---------------|
 | POST   | `/register`                  | Register a new user                    | None          |
@@ -252,13 +252,13 @@ curl -X GET https://analytics.essentialnews.ng/api/analytics/pageviews \
 |--------|----------------|--------------------------------|------------|
 | POST   | `/sites`       | Register a website/domain      | `api.key`  |
 
-### 📈 Tracking Routes
+###  Tracking Routes
 | Method | Endpoint              | Description                 | Middleware              |
 |--------|-----------------------|-----------------------------|--------------------------|
 | POST   | `/track/pageview`     | Track a page view           | `api.key`, `throttle`   |
 | POST   | `/track/click`        | Track click on elements     | `api.key`, `throttle`   |
 
-### 📊 Analytics Routes
+###  Analytics Routes
 | Method | Endpoint                           | Description                            | Middleware            |
 |--------|------------------------------------|----------------------------------------|------------------------|
 | GET    | `/analytics/pageviews`             | Get total page views                   | `api.key`, `throttle` |
@@ -275,14 +275,14 @@ curl -X GET https://analytics.essentialnews.ng/api/analytics/pageviews \
 
 ---
 
-## 🧩 Troubleshooting
-- ❌ **401 Unauthorized**: Make sure your JWT token is valid
-- ❌ **403 Forbidden**: You’re not authorized for that action
-- ❌ **No Tracking?**: Check browser console and network tab
+##  Troubleshooting
+-  **401 Unauthorized**: Make sure your JWT token is valid
+-  **403 Forbidden**: You’re not authorized for that action
+-  **No Tracking?**: Check browser console and network tab
 
 ---
 
-## 🛠 For Administrators
+##  For Administrators
 Admins have access to:
 - All sites’ data
 - User management
@@ -290,12 +290,12 @@ Admins have access to:
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 Pull requests are welcome! Please follow the contribution guide in `CONTRIBUTING.md`.
 
 ---
 
-## 💬 Support
+##  Support
 Need help?
 - Email: webmasterjdd@gmail.com
 - WhatsApp: +234-814-841-3982
@@ -303,4 +303,4 @@ Need help?
 
 ---
 
-**Built with ❤️ using Laravel, Redis, and MaxMind.**
+**Built using Laravel, Redis, and MaxMind.**

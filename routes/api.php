@@ -1,9 +1,11 @@
 <?php
 
-use App\Http\Controllers\AdminController;
-use App\Http\Controllers\AnalyticsController;
-use App\Http\Controllers\TrackingController;
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\API\AdminController;
+use App\Http\Controllers\API\AnalyticsController;
+
+use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\API\TrackingController;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
 
@@ -26,7 +28,7 @@ Route::get('test-email', function () {
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::get('/verify-email', [AuthController::class, 'verifyEmail']);
-Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationEmail']);
+Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationEmail'])->name('resend-verification');
 Route::post('/password-confirm', [AuthController::class, 'passwordConfirm']); //  YET TO BE IMPLEMENTED
 Route::post('/password-reset-request', [AuthController::class, 'sendPasswordResetEmail']);
 Route::post('/password-reset', [AuthController::class, 'resetPassword']);
@@ -54,6 +56,8 @@ Route::post('/sites', [AuthController::class, 'registerSite'])->middleware('api.
 
 Route::middleware(['api.key', 'throttle:1000,1'])->group(function () {
     Route::post('/track/pageview', [TrackingController::class, 'trackPageView']);
+    Route::get('/page-views', [TrackingController::class, 'getPageViews']);
+    Route::get('/page-insights', [TrackingController::class, 'getPageInsights']);
     Route::post('/track/click', [TrackingController::class, 'trackClick']);
     Route::get('/analytics/pageviews', [AnalyticsController::class, 'pageViews']);
     Route::get('/analytics/pageviews/by-page', [AnalyticsController::class, 'pageViewsByPage']);
