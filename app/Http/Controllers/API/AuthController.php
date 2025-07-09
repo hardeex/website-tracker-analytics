@@ -390,21 +390,6 @@ public function checkUser()
     }
 }
 
-public function registerSite(Request $request)
-{
-    $validated = $request->validate([
-        'domain' => 'required|string|unique:sites',
-        'name' => 'required|string',
-    ]);
-
-    $site = Site::create([
-        'domain' => $validated['domain'],
-        'name' => $validated['name'],
-        'user_id' => JWTAuth::user()->id,
-    ]);
-
-    return response()->json(['site' => $site]);
-}
 
 
 

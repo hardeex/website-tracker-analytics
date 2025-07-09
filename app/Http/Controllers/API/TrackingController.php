@@ -3,284 +3,415 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\ProcessClick;
-use App\Jobs\ProcessPageView;
-use App\Models\PageView;
+use App\Jobs\ProcessEvent;
 use App\Models\Site;
+use App\Models\Analytic;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Database\QueryException;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class TrackingController extends Controller
 {
-    
-  public function trackPageView(Request $request)
-{
-    Log::debug('Incoming page view tracking request.', [
-        'payload' => $request->all(),
-        'ip' => $request->ip(),
-        'headers' => $request->headers->all(),
-    ]);
-
-    $validated = $request->validate([
-        'domain' => 'required|string',
-        'page_url' => 'required|url',
-        'user_agent' => 'nullable|string',
-        'session_duration' => 'nullable|integer|min:0',
-    ]);
-
-    Log::debug('Validated request data.', $validated);
-
-    $site = Site::where('domain', $validated['domain'])->first();
-
-    if (!$site) {
-        Log::warning('No site found for domain.', ['domain' => $validated['domain']]);
-        return response()->json(['error' => 'Site not found.'], 404);
-    }
-
-    $user = JWTAuth::user();
-    Log::debug('Authenticated user.', ['user_id' => optional($user)->id]);
-
-    // Check if user has access to the site
-    if (!$user || $user->id !== $site->user_id) {
-        Log::warning('Unauthorized access attempt.', [
-            'user_id' => optional($user)->id,
-            'site_user_id' => $site->user_id,
-        ]);
-        return response()->json(['error' => 'Unauthorized for this site'], 403);
-    }
-
-    $data = [
-    'site_id' => $site->id,
-    'page_url' => $validated['page_url'],
-    'ip_address' => $request->ip(),
-    'user_agent' => $validated['user_agent'] ?? $request->userAgent(),
-    'user_id' => $user->id,
-    'session_duration' => $validated['session_duration'] ?? null,
-];
-
-
-    Log::info('Dispatching page view job.', $data);
-
-    ProcessPageView::dispatch($data);
-
-    return response()->json(['message' => 'Page view tracked'], 202);
-}
-
-    public function trackClick(Request $request)
+    protected function validator(array $data, array $rules)
     {
-        $validated = $request->validate([
-            'domain' => 'required|string',
-            'element_id' => 'nullable|string',
-            'page_url' => 'required|url',
-            'user_agent' => 'nullable|string',
+        return Validator::make($data, $rules, [
+            'required' => 'The :attribute field is required.',
+            'string' => 'The :attribute must be a valid string.',
+            'unique' => 'The :attribute is already registered.',
+            'url' => 'The :attribute must be a valid URL (e.g., https://example.com).',
+            'in' => 'The :attribute must be one of: :values.',
+            'date' => 'The :attribute must be a valid date (e.g., YYYY-MM-DD).',
+            'integer' => 'The :attribute must be an integer.',
+            'min' => 'The :attribute must be at least :min.',
+            'max' => 'The :attribute may not be greater than :max characters.',
+        ]);
+    }
+
+    protected function standardizedResponse($data, $status = 200)
+    {
+        return response()->json(array_merge([
+            'status' => $status < 400 ? 'success' : 'error',
+            'timestamp' => now()->toIso8601String(),
+        ], $data), $status);
+    }
+
+    public function registerSite(Request $request)
+    {
+        $validator = $this->validator($request->all(), [
+            'domain' => 'required|string|unique:sites|max:255',
+            'name' => 'required|string|max:255',
         ]);
 
-        $site = Site::where('domain', $validated['domain'])->firstOrFail();
-        $user = JWTAuth::user();
-
-        if ($user->id !== $site->user_id) {
-            return response()->json(['error' => 'Unauthorized for this site'], 403);
+        if ($validator->fails()) {
+            Log::warning('Site registration validation failed', [
+                'errors' => $validator->errors()->all(),
+                'input' => $request->except('api_key'),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Validation failed',
+                'details' => $validator->errors()->all(),
+            ], 422);
         }
 
-        $data = [
-            'site_id' => $site->id,
-            'element_id' => $validated['element_id'] ?? null,
-            'page_url' => $validated['page_url'],
-            'ip_address' => $request->ip(),
-            'user_agent' => $validated['user_agent'],
-            'user_id' => $user->id,
-        ];
+        $apiKey = Str::uuid()->toString();
 
-        ProcessClick::dispatch($data);
+        try {
+            $site = Site::create([
+                'domain' => rtrim($request->domain, '/'),
+                'name' => $request->name,
+                'api_key' => $apiKey,
+            ]);
 
-        return response()->json(['message' => 'Click tracked'], 202);
+            ProcessEvent::dispatch([
+                'site_id' => $site->id,
+                'event_type' => 'site_registered',
+                'page_url' => $site->domain,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
+            Log::info('Site registered successfully', [
+                'site_id' => $site->id,
+                'domain' => $site->domain,
+            ]);
+
+            return $this->standardizedResponse([
+                'message' => 'Site registered successfully',
+                'site' => [
+                    'id' => $site->id,
+                    'domain' => $site->domain,
+                    'name' => $site->name,
+                    'api_key' => $site->api_key,
+                ],
+                'tracking_code' => "<script src=\"".config('app.api_domain')."/api/tracker.js?api_key={$apiKey}\"></script>",
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Site registration failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Failed to register site',
+                'details' => 'An unexpected server error occurred.',
+            ], 500);
+        }
     }
 
+    public function trackEvent(Request $request)
+    {
+        $validator = $this->validator($request->all(), [
+            'api_key' => 'required|string',
+            'event_type' => 'required|string|in:pageview,click',
+            'page_url' => 'required|url',
+            'element_id' => 'nullable|string|max:255',
+            'session_duration' => 'nullable|integer|min:0',
+            'user_agent' => 'nullable|string|max:1000',
+        ]);
 
-//     public function getPageViews(Request $request)
-// {
-//     $validated = $request->validate([
-//         'domain' => 'required|url',
-//     ]);
+        if ($validator->fails()) {
+            Log::warning('Event tracking validation failed', [
+                'errors' => $validator->errors()->all(),
+                'input' => $request->except('api_key'),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Validation failed',
+                'details' => $validator->errors()->all(),
+            ], 422);
+        }
 
-//     $site = Site::where('domain', $validated['domain'])->first();
+        $site = Site::where('api_key', $request->api_key)->first();
 
-//     if (!$site) {
-//         return response()->json(['error' => 'Site not found.'], 404);
-//     }
+        if (!$site) {
+            Log::warning('Invalid API key for event tracking', [
+                'api_key' => $request->api_key,
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Invalid API key',
+                'details' => 'The provided API key does not match any registered site.',
+            ], 403);
+        }
 
-//     $user = JWTAuth::user();
-//     if (!$user || $user->id !== $site->user_id) {
-//         return response()->json(['error' => 'Unauthorized'], 403);
-//     }
+        $parsedPageUrl = parse_url($request->page_url, PHP_URL_HOST);
+        $parsedSiteDomain = parse_url($site->domain, PHP_URL_HOST);
+        if ($parsedPageUrl !== $parsedSiteDomain) {
+            Log::warning('Page URL does not match site domain', [
+                'page_url' => $request->page_url,
+                'site_domain' => $site->domain,
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Invalid page URL',
+                'details' => 'The page URL does not belong to the registered site domain.',
+            ], 403);
+        }
 
-//     $viewsCount = \App\Models\PageView::where('site_id', $site->id)->count();
+        try {
+            $data = [
+                'site_id' => $site->id,
+                'event_type' => $request->event_type,
+                'page_url' => $request->page_url,
+                'element_id' => $request->element_id ?? null,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->user_agent ?? $request->userAgent(),
+                'session_duration' => $request->session_duration ?? null,
+            ];
 
-//     return response()->json([
-//         'domain' => $validated['domain'],
-//         'views' => $viewsCount,
-//     ]);
-// }
+            ProcessEvent::dispatch($data);
 
+            Log::info('Event tracked successfully', [
+                'site_id' => $site->id,
+                'event_type' => $data['event_type'],
+                'page_url' => $data['page_url'],
+            ]);
 
-public function getPageViews2(Request $request)
-{
-    $validated = $request->validate([
-        'domain' => 'required|url',
-    ]);
-
-    $site = Site::where('domain', $validated['domain'])->first();
-
-    if (!$site) {
-        return response()->json(['error' => 'Site not found.'], 404);
+            return $this->standardizedResponse([
+                'message' => 'Event tracked successfully',
+                'event_type' => $request->event_type,
+                'page_url' => $request->page_url,
+            ], 202);
+        } catch (\Exception $e) {
+            Log::error('Event tracking failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Failed to track event',
+                'details' => 'An unexpected server error occurred.',
+            ], 500);
+        }
     }
 
-    $user = JWTAuth::user();
-    if (!$user || $user->id !== $site->user_id) {
-        return response()->json(['error' => 'Unauthorized'], 403);
+    public function getAnalytics(Request $request)
+    {
+        $validator = $this->validator($request->all(), [
+            'api_key' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            Log::warning('Analytics retrieval validation failed', [
+                'errors' => $validator->errors()->all(),
+                'input' => $request->except('api_key'),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Validation failed',
+                'details' => $validator->errors()->all(),
+            ], 422);
+        }
+
+        $site = Site::where('api_key', $request->api_key)->first();
+
+        if (!$site) {
+            Log::warning('Invalid API key for analytics', [
+                'api_key' => $request->api_key,
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Invalid API key',
+                'details' => 'The provided API key does not match any registered site.',
+            ], 403);
+        }
+
+        try {
+            $today = Carbon::today()->startOfDay();
+            $todayEnd = Carbon::today()->endOfDay();
+            $yesterday = Carbon::yesterday()->startOfDay();
+            $yesterdayEnd = Carbon::yesterday()->endOfDay();
+            $thisWeekStart = Carbon::now()->startOfWeek();
+            $thisMonthStart = Carbon::now()->startOfMonth();
+            $lastMonthStart = Carbon::now()->subMonth()->startOfMonth();
+            $lastMonthEnd = Carbon::now()->subMonth()->endOfMonth();
+            $lastTwoMonthsStart = Carbon::now()->subMonths(2)->startOfMonth();
+            $thisYearStart = Carbon::now()->startOfYear();
+
+            $periods = [
+                'today' => ['start' => $today, 'end' => $todayEnd],
+                'yesterday' => ['start' => $yesterday, 'end' => $yesterdayEnd],
+                'this_week' => ['start' => $thisWeekStart, 'end' => Carbon::now()],
+                'this_month' => ['start' => $thisMonthStart, 'end' => Carbon::now()],
+                'last_month' => ['start' => $lastMonthStart, 'end' => $lastMonthEnd],
+                'last_two_months' => ['start' => $lastTwoMonthsStart, 'end' => $lastMonthEnd],
+                'this_year' => ['start' => $thisYearStart, 'end' => Carbon::now()],
+            ];
+
+            $analytics = [];
+
+            foreach ($periods as $period => $range) {
+                $views = Analytic::where('site_id', $site->id)
+                    ->where('event_type', 'pageview')
+                    ->whereBetween('created_at', [$range['start'], $range['end']])
+                    ->selectRaw('DATE_FORMAT(created_at, "%Y-%m-%d") as period, COUNT(*) as count')
+                    ->groupBy('period')
+                    ->orderBy('period')
+                    ->get();
+
+                $clicks = Analytic::where('site_id', $site->id)
+                    ->where('event_type', 'click')
+                    ->whereBetween('created_at', [$range['start'], $range['end']])
+                    ->selectRaw('DATE_FORMAT(created_at, "%Y-%m-%d") as period, COUNT(*) as count')
+                    ->groupBy('period')
+                    ->orderBy('period')
+                    ->get();
+
+                $topPages = Analytic::where('site_id', $site->id)
+                    ->where('event_type', 'pageview')
+                    ->whereBetween('created_at', [$range['start'], $range['end']])
+                    ->select('page_url', DB::raw('COUNT(*) as views'))
+                    ->groupBy('page_url')
+                    ->orderByDesc('views')
+                    ->limit(5)
+                    ->get();
+
+                $uniqueVisitors = Analytic::where('site_id', $site->id)
+                    ->where('event_type', 'pageview')
+                    ->whereBetween('created_at', [$range['start'], $range['end']])
+                    ->distinct('ip_address')
+                    ->count('ip_address');
+
+                $byCountry = Analytic::where('site_id', $site->id)
+                    ->where('event_type', 'pageview')
+                    ->whereBetween('created_at', [$range['start'], $range['end']])
+                    ->select('country', DB::raw('COUNT(*) as count'))
+                    ->groupBy('country')
+                    ->orderByDesc('count')
+                    ->get();
+
+                $analytics[$period] = [
+                    'views' => $views,
+                    'clicks' => $clicks,
+                    'top_pages' => $topPages,
+                    'unique_visitors' => $uniqueVisitors,
+                    'by_country' => $byCountry,
+                ];
+            }
+
+            $allViews = Analytic::where('site_id', $site->id)
+                ->where('event_type', 'pageview')
+                ->selectRaw('DATE_FORMAT(created_at, "%Y-%m-%d") as period, COUNT(*) as count')
+                ->groupBy('period')
+                ->orderBy('period')
+                ->get();
+
+            $allClicks = Analytic::where('site_id', $site->id)
+                ->where('event_type', 'click')
+                ->selectRaw('DATE_FORMAT(created_at, "%Y-%m-%d") as period, COUNT(*) as count')
+                ->groupBy('period')
+                ->orderBy('period')
+                ->get();
+
+            $allTopPages = Analytic::where('site_id', $site->id)
+                ->where('event_type', 'pageview')
+                ->select('page_url', DB::raw('COUNT(*) as views'))
+                ->groupBy('page_url')
+                ->orderByDesc('views')
+                ->limit(10)
+                ->get();
+
+            $allUniqueVisitors = Analytic::where('site_id', $site->id)
+                ->where('event_type', 'pageview')
+                ->distinct('ip_address')
+                ->count('ip_address');
+
+            $allByCountry = Analytic::where('site_id', $site->id)
+                ->where('event_type', 'pageview')
+                ->select('country', DB::raw('COUNT(*) as count'))
+                ->groupBy('country')
+                ->orderByDesc('count')
+                ->get();
+
+            Log::info('Analytics retrieved successfully', [
+                'site_id' => $site->id,
+                'domain' => $site->domain,
+            ]);
+
+            return $this->standardizedResponse([
+                'message' => 'Analytics retrieved successfully',
+                'data' => [
+                    'domain' => $site->domain,
+                    'all_time' => [
+                        'views' => $allViews,
+                        'clicks' => $allClicks,
+                        'top_pages' => $allTopPages,
+                        'unique_visitors' => $allUniqueVisitors,
+                        'by_country' => $allByCountry,
+                    ],
+                    'breakdowns' => $analytics,
+                ],
+            ], 200);
+        } catch (QueryException $e) {
+            Log::error('Database error in analytics retrieval', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Failed to retrieve analytics',
+                'details' => 'A database error occurred.',
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Analytics retrieval failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Failed to retrieve analytics',
+                'details' => 'An unexpected server error occurred.',
+            ], 500);
+        }
     }
 
-    $views = [
-        'today' => \App\Models\PageView::where('site_id', $site->id)
-                    ->whereDate('created_at', today())->count(),
+    public function getTrackingScript(Request $request)
+    {
+        $validator = $this->validator($request->all(), [
+            'api_key' => 'required|string',
+        ]);
 
-        'yesterday' => \App\Models\PageView::where('site_id', $site->id)
-                    ->whereDate('created_at', today()->subDay())->count(),
+        if ($validator->fails()) {
+            Log::warning('Tracking script request validation failed', [
+                'errors' => $validator->errors()->all(),
+                'input' => $request->except('api_key'),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Validation failed',
+                'details' => $validator->errors()->all(),
+            ], 422);
+        }
 
-        'this_week' => \App\Models\PageView::where('site_id', $site->id)
-                    ->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])
-                    ->count(),
+        $site = Site::where('api_key', $request->api_key)->first();
 
-        'last_week' => \App\Models\PageView::where('site_id', $site->id)
-                    ->whereBetween('created_at', [now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek()])
-                    ->count(),
+        if (!$site) {
+            Log::warning('Invalid API key for tracking script', [
+                'api_key' => $request->api_key,
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Invalid API key',
+                'details' => 'The provided API key does not match any registered site.',
+            ], 403);
+        }
 
-        'this_month' => \App\Models\PageView::where('site_id', $site->id)
-                    ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
-                    ->count(),
+        try {
+            $script = file_get_contents(resource_path('js/tracker.js'));
+            $script = str_replace('{{API_KEY}}', $request->api_key, $script);
+            $script = str_replace('{{API_DOMAIN}}', config('app.api_domain'), $script);
 
-        'last_month' => \App\Models\PageView::where('site_id', $site->id)
-                    ->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()])
-                    ->count(),
+            Log::info('Tracking script served successfully', [
+                'site_id' => $site->id,
+                'domain' => $site->domain,
+            ]);
 
-        'total' => \App\Models\PageView::where('site_id', $site->id)->count(),
-    ];
-
-    return response()->json([
-        'domain' => $validated['domain'],
-        'views' => $views,
-    ]);
-}
-
-
-public function getPageViews(Request $request)
-{
-    $validated = $request->validate([
-        'domain' => 'required|url',
-    ]);
-
-    $site = Site::where('domain', $validated['domain'])->first();
-
-    if (!$site) {
-        return response()->json(['error' => 'Site not found.'], 404);
+            return response($script, 200, [
+                'Content-Type' => 'application/javascript',
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to serve tracking script', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->standardizedResponse([
+                'error' => 'Failed to serve tracking script',
+                'details' => 'An unexpected server error occurred.',
+            ], 500);
+        }
     }
-
-    $user = JWTAuth::user();
-    if (!$user || $user->id !== $site->user_id) {
-        return response()->json(['error' => 'Unauthorized'], 403);
-    }
-
-    $views = [
-        'today' => PageView::where('site_id', $site->id)
-                    ->whereDate('created_at', today())->count(),
-
-        'yesterday' => PageView::where('site_id', $site->id)
-                    ->whereDate('created_at', today()->subDay())->count(),
-
-        'this_week' => PageView::where('site_id', $site->id)
-                    ->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])
-                    ->count(),
-
-        'last_week' => PageView::where('site_id', $site->id)
-                    ->whereBetween('created_at', [now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek()])
-                    ->count(),
-
-        'this_month' => PageView::where('site_id', $site->id)
-                    ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
-                    ->count(),
-
-        'last_month' => PageView::where('site_id', $site->id)
-                    ->whereBetween('created_at', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()])
-                    ->count(),
-
-        'total' => PageView::where('site_id', $site->id)->count(),
-    ];
-
-    $topPages = PageView::where('site_id', $site->id)
-        ->select('page_url', DB::raw('count(*) as views'))
-        ->groupBy('page_url')
-        ->orderByDesc('views')
-        ->limit(5)
-        ->get();
-
-    $uniqueVisitors = PageView::where('site_id', $site->id)
-        ->distinct('ip_address')
-        ->count('ip_address');
-
-    $byCountry = PageView::where('site_id', $site->id)
-        ->select('country', DB::raw('count(*) as count'))
-        ->groupBy('country')
-        ->orderByDesc('count')
-        ->get();
-
-    return response()->json([
-        'domain' => $validated['domain'],
-        'views' => $views,
-        'top_pages' => $topPages,
-        'unique_visitors' => $uniqueVisitors,
-        'by_country' => $byCountry,
-    ]);
-}
-
-
-public function getPageInsights(Request $request)
-{
-    $validated = $request->validate([
-        'domain' => 'required|url',
-    ]);
-
-    $site = Site::where('domain', $validated['domain'])->first();
-
-    if (!$site) {
-        return response()->json(['error' => 'Site not found.'], 404);
-    }
-
-    $user = JWTAuth::user();
-    if (!$user || $user->id !== $site->user_id) {
-        return response()->json(['error' => 'Unauthorized'], 403);
-    }
-
-    return response()->json([
-        'top_pages' => PageView::where('site_id', $site->id)
-            ->select('page_url', DB::raw('count(*) as views'))
-            ->groupBy('page_url')
-            ->orderByDesc('views')
-            ->limit(5)
-            ->get(),
-
-        'unique_visitors' => PageView::where('site_id', $site->id)
-            ->distinct('ip_address')
-            ->count('ip_address'),
-
-        'by_country' => PageView::where('site_id', $site->id)
-            ->select('country', DB::raw('count(*) as count'))
-            ->groupBy('country')
-            ->orderByDesc('count')
-            ->get(),
-    ]);
-}
-
-
 }

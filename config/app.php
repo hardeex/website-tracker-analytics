@@ -54,6 +54,7 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
     'backend_url' => env('BACKEND_URL', 'http://analytics.test'),
+    'api_domain' => env('API_DOMAIN', 'http://analytics.test'),
 
     /*
     |--------------------------------------------------------------------------

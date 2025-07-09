@@ -29,7 +29,7 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::get('/verify-email', [AuthController::class, 'verifyEmail']);
 Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationEmail'])->name('resend-verification');
-Route::post('/password-confirm', [AuthController::class, 'passwordConfirm']); //  YET TO BE IMPLEMENTED
+Route::post('/password-confirm', [AuthController::class, 'passwordConfirm']); 
 Route::post('/password-reset-request', [AuthController::class, 'sendPasswordResetEmail']);
 Route::post('/password-reset', [AuthController::class, 'resetPassword']);
 Route::get('/logged-in-user', [AuthController::class, 'checkUser']);
@@ -40,31 +40,30 @@ Route::middleware('auth')->group(function () {
     // authentication routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
-
-   
-
 });
 
 
-
-
-
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/refresh', [AuthController::class, 'refresh'])->middleware('api.key');
-Route::post('/sites', [AuthController::class, 'registerSite'])->middleware('api.key');
+Route::middleware(['throttle:1000,1'])->group(function () {
+    Route::post('/sites', [TrackingController::class, 'registerSite'])->name('sites.register');
+    Route::post('/track', [TrackingController::class, 'trackEvent'])->name('track.event');
+    Route::get('/analytics', [TrackingController::class, 'getAnalytics'])->name('analytics.get');
+    Route::get('/tracker.js', [TrackingController::class, 'getTrackingScript'])->name('tracker.script');
+});
 
 Route::middleware(['api.key', 'throttle:1000,1'])->group(function () {
-    Route::post('/track/pageview', [TrackingController::class, 'trackPageView']);
-    Route::get('/page-views', [TrackingController::class, 'getPageViews']);
-    Route::get('/page-insights', [TrackingController::class, 'getPageInsights']);
-    Route::post('/track/click', [TrackingController::class, 'trackClick']);
-    Route::get('/analytics/pageviews', [AnalyticsController::class, 'pageViews']);
+    // Route::post('/sites', [TrackingController::class, 'registerSite']);
+    // Route::post('/setup-site', [TrackingController::class, 'setupSite']);
+    // Route::post('/track/pageview', [TrackingController::class, 'trackPageView']);
+    // Route::get('/page-views', [TrackingController::class, 'getPageViews']);
+    // Route::get('/page-insights', [TrackingController::class, 'getPageInsights']);
+    // Route::post('/track/click', [TrackingController::class, 'trackClick']);
+
+    Route::get('/analytics/pageviews', [AnalyticsController::class, 'pageViews']); //redundant
     Route::get('/analytics/pageviews/by-page', [AnalyticsController::class, 'pageViewsByPage']);
     Route::get('/analytics/session-duration', [AnalyticsController::class, 'sessionDuration']);
     Route::get('/analytics/geolocation', [AnalyticsController::class, 'geolocation']);
     Route::get('/analytics/clicks', [AnalyticsController::class, 'clicks']);
-    Route::get('/analytics/clicks/by-element', [AnalyticsController::class, 'clicksByElement']);
+    Route::get('/analytics/clicks/by-element', [AnalyticsController::class, 'clicksByElement']); // to be confirmed
 });
 
 Route::middleware(['api.key', 'admin'])->group(function () {
