@@ -7,17 +7,22 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
+
 class ProcessEvent implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
+
     protected $data;
+
     public function __construct(array $data)
     {
         $this->data = $data;
     }
+
     public function handle()
     {
         Log::info('Processing event', ['data' => $this->data]);
+
         if ($this->data['event_type'] === 'site_registered') {
             Log::info('Skipping site_registered event', [
                 'site_id' => $this->data['site_id'],
@@ -25,6 +30,7 @@ class ProcessEvent implements ShouldQueue
             ]);
             return;
         }
+
         try {
             $geoipPath = config('app.geoip_database_path');
             Log::info('GeoIP path', ['path' => $geoipPath]);
@@ -46,6 +52,7 @@ class ProcessEvent implements ShouldQueue
             $country = null;
             $city = null;
         }
+
         try {
             $analytic = Analytic::create([
                 'site_id' => $this->data['site_id'],
@@ -57,6 +64,7 @@ class ProcessEvent implements ShouldQueue
                 'country' => $country,
                 'city' => $city,
                 'session_duration' => $this->data['session_duration'] ?? null,
+                'session_id' => $this->data['session_id'] ?? null, // Added
             ]);
             Log::info('Analytic record created', ['id' => $analytic->id]);
         } catch (\Exception $e) {

@@ -47,25 +47,7 @@ Route::middleware(['throttle:1000,1'])->group(function () {
     Route::post('/sites', [TrackingController::class, 'registerSite'])->name('sites.register');
     Route::post('/track', [TrackingController::class, 'trackEvent'])->name('track.event');
     Route::get('/analytics', [TrackingController::class, 'getAnalytics'])->name('analytics.get');
-    Route::get('/tracker.js', [TrackingController::class, 'getTrackingScript'])->name('tracker.script');
+    Route::get('/script.js', [TrackingController::class, 'getTrackingScript'])->name('tracker.script');
 });
 
-Route::middleware(['api.key', 'throttle:1000,1'])->group(function () {
-    // Route::post('/sites', [TrackingController::class, 'registerSite']);
-    // Route::post('/setup-site', [TrackingController::class, 'setupSite']);
-    // Route::post('/track/pageview', [TrackingController::class, 'trackPageView']);
-    // Route::get('/page-views', [TrackingController::class, 'getPageViews']);
-    // Route::get('/page-insights', [TrackingController::class, 'getPageInsights']);
-    // Route::post('/track/click', [TrackingController::class, 'trackClick']);
 
-    Route::get('/analytics/pageviews', [AnalyticsController::class, 'pageViews']); //redundant
-    Route::get('/analytics/pageviews/by-page', [AnalyticsController::class, 'pageViewsByPage']);
-    Route::get('/analytics/session-duration', [AnalyticsController::class, 'sessionDuration']);
-    Route::get('/analytics/geolocation', [AnalyticsController::class, 'geolocation']);
-    Route::get('/analytics/clicks', [AnalyticsController::class, 'clicks']);
-    Route::get('/analytics/clicks/by-element', [AnalyticsController::class, 'clicksByElement']); // to be confirmed
-});
-
-Route::middleware(['api.key', 'admin'])->group(function () {
-    Route::get('/analytics/all-pageviews', [AdminController::class, 'allPageViews']);
-});

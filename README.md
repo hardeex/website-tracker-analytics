@@ -1,42 +1,51 @@
 
+---
+
 # Laravel Analytics Tracker – Easy Integration Guide
 
-This is a plug-and-play analytics tracking system that works for **any website**. No complex setup. Just copy-paste and start tracking **page views**, **clicks**, and **session time** with detailed analytics.
+The **Laravel Analytics Tracker** is a plug-and-play analytics system for any website. With **minimal setup**, track:
+
+Page Views
+Clicks
+Session Duration
+Visitor Metrics (Total, New, Active, Returning, and Daily Visitors)
+
+> No complex configuration — just copy, paste, and start tracking!
 
 ---
 
-## Features
+##  Features
 
-- Simple setup
-- Auto-tracks every page view and click
-- Tracks how long users stay on each page
-- Breakdowns by country, traffic, top pages
-- API access to full analytics
-- No dependencies – pure Vanilla JavaScript
-
----
-
-## 🧩 How It Works
-
-1. Register your website
-2. Get a unique `api_key`
-3. Paste a tracking script on your site - Prefeerably your base or index layout
-4. Done! Analytics starts flowing ✨
+* **Simple Setup**: One script tag and you're live.
+* **Automatic Tracking**: Page views, clicks, and session duration.
+* **Visitor Metrics**: Total, New, Active, Returning, and Daily.
+* **Detailed Reports**: Time-based, by country, and top pages.
+* **API Access**: Fetch analytics with an HTTP request.
+* **No Dependencies**: Pure Vanilla JS — no jQuery or frameworks.
+* **Backward Compatible**: Works on any existing site.
 
 ---
 
-## 🛠️ Step 1: Register Your Website
+## How It Works
 
-Make a `POST` request to register your site.
+1. **Register**: Get your unique `api_key` and tracking script.
+2. **Embed**: Add the script tag to your site.
+3. **Track**: The tracker collects data automatically.
+4. **Analyze**: Use the analytics API to fetch reports.
+5. **Upgrade (Optional)**: Use the newer script for enhanced visitor metrics.
 
-### ➤ Endpoint:
+---
+
+## Step 1: Register Your Website
+
+**Endpoint:**
+
+```
+POST https://analytics.essentialnews.ng/api/sites
 ```
 
-POST [https://analytics.essentialnews.ng/api/sites](https://analytics.essentialnews.ng/api/sites)
+**Sample Request:**
 
-````
-
-### Sample Request (via Postman or Terminal):
 ```bash
 curl -X POST https://analytics.essentialnews.ng/api/sites \
   -H "Content-Type: application/json" \
@@ -44,55 +53,69 @@ curl -X POST https://analytics.essentialnews.ng/api/sites \
     "domain": "https://yourwebsite.com",
     "name": "My Website"
 }'
-````
+```
 
-### Response:
+**Sample Response:**
 
 ```json
 {
+  "status": "success",
+  "message": "Site registered successfully",
   "site": {
+    "id": 1,
+    "domain": "https://yourwebsite.com",
+    "name": "My Website",
     "api_key": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   },
-  "tracking_code": "<script src=\"https://analytics.essentialnews.ng/api/tracker.js?api_key=xxxxxxxx\"></script>"
+  "tracking_code": "<script src=\"https://analytics.essentialnews.ng/api/tracker.js?api_key=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\"></script>"
 }
 ```
 
+> **Note**: Domain must be unique and served over HTTPS.
+
 ---
 
-## 🔧 Step 2: Add the Script to Every Page
+## 🔧 Step 2: Add the Tracking Script
 
-Paste the script tag just before `</body>` or in the `<head>` of your site.
-
-### HTML Example:
+Paste this script in your layout file (Blade, HTML, React, etc.):
 
 ```html
-<!-- Add this to all your pages -->
-<script src="https://analytics.essentialnews.ng/api/tracker.js?api_key=xxxxxxxx"></script>
+<script src="https://analytics.essentialnews.ng/api/tracker.js?api_key=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></script>
 ```
 
- **Pro Tip:** If your site uses a layout template (e.g. Laravel Blade, React layout, etc.), paste it once in the layout to apply everywhere.
+> **Best Practice**: Add this in the `<head>` or right before `</body>` for full-page tracking.
+
+**For Existing Users**: If you use `/api/process.js`, you're still tracking basic metrics. To unlock **visitor stats**, switch to `/api/tracker.js`.
 
 ---
 
-##  What It Tracks Automatically
+## What It Tracks Automatically
 
-| Event              | Trigger      | Extra Info Sent          |
-| ------------------ | ------------ | ------------------------ |
-| `pageview`         | On page load | URL, browser, IP         |
-| `click`            | On any click | `element_id` (if exists) |
-| `session_duration` | On unload    | Seconds spent on page    |
+| Event              | Trigger        | Data Sent                     |
+| ------------------ | -------------- | ----------------------------- |
+| `pageview`         | On page load   | URL, browser, IP, session\_id |
+| `click`            | On any click   | element\_id (if available)    |
+| `session_duration` | On page unload | Seconds spent on page         |
 
-No extra setup. Just the script = full tracking. 🚀
+**Visitor Metrics** (with updated script):
+
+* Total Visitors
+* New Visitors
+* Active Visitors
+* Returning Visitors
+* Daily Visitors
 
 ---
 
 ## Optional: Track Custom Events
 
-Want to track something manually? Use:
+Use the `tracker` object to fire events manually:
 
 ```js
+// Track a button click
 window.tracker?.track('click', { element_id: 'my-button' });
 
+// Track custom pageview with duration
 window.tracker?.track('pageview', { session_duration: 90 });
 ```
 
@@ -100,65 +123,123 @@ window.tracker?.track('pageview', { session_duration: 90 });
 
 ## Step 3: View Your Analytics
 
-To get a full report of views, clicks, top pages, and visitors:
-
-### ➤ Endpoint:
+**Endpoint:**
 
 ```
-GET https://analytics.essentialnews.ng/api/analytics?api_key=xxxxxxxx
+GET https://analytics.essentialnews.ng/api/analytics?api_key=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
-It returns:
+**Sample Request:**
 
-* Daily breakdowns (today, week, month)
-* Top countries
-* Top pages
-* Unique visitors
-
-Use this data to build a dashboard or show insights.
-
----
-
-## Want to Inspect Events?
-
-Open DevTools in your browser:
-
-1. Go to **Network → Fetch/XHR**
-2. You’ll see calls to `/api/track`
-3. You’re live! 🔴
-
----
-
-## Common Errors
-
-| Issue               | Fix                                                |
-| ------------------- | -------------------------------------------------- |
-| `Invalid API key`   | Ensure your script tag has the correct key         |
-| `Validation failed` | Missing required fields or wrong format            |
-| `page_url mismatch` | Only pages from the registered domain are accepted |
-
----
-
-## Safety Notes
-
-* Your site must be accessible via HTTPS (for accurate IP/location).
-*  Do **not** expose your analytics API key in public if you're tracking sensitive data.
-* CORS must be properly configured if using across origins.
-
----
-
-## Quick Summary
-
-1. Register your site to get an API key
-2. Paste the script in your site layout
-3. Done! Tracking is automatic
-4. View analytics via the `/analytics` endpoint
-
----
-
-Made with ❤️ using Laravel, JavaScript, and common sense.
-
-Need help? Open an issue or contact the developer - webmasterjdd@gmail.com.
-
+```bash
+curl -X GET "https://analytics.essentialnews.ng/api/analytics?api_key=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
+
+**Sample Response (Truncated):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "domain": "https://yourwebsite.com",
+    "all_time": {
+      "views": [...],
+      "clicks": [...],
+      "top_pages": [...],
+      "unique_visitors": 75,
+      "new_visitors": 60,
+      "returning_visitors": 15,
+      "daily_visitors": [...],
+      "by_country": [...]
+    },
+    "breakdowns": {
+      "today": {...},
+      "this_week": {...},
+      "this_month": {...},
+      "this_year": {...}
+    }
+  }
+}
+```
+
+---
+
+## Inspect & Debug
+
+1. Open **DevTools** (F12).
+2. Go to **Network → Fetch/XHR**.
+3. Look for requests to `/api/track`.
+4. Confirm payload includes:
+
+   * `event_type`
+   * `page_url`
+   * `session_id`, etc.
+
+---
+
+## Common Errors & Fixes
+
+| Issue             | Fix                                                          |
+| ----------------- | ------------------------------------------------------------ |
+| Invalid API Key   | Ensure it matches the key received on registration.          |
+| Validation Failed | Check required fields: `page_url`, `event_type`, etc.        |
+| Domain Mismatch   | Tracked domain must match the registered domain.             |
+| No Visitor Data   | Update script to `/api/tracker.js` for full visitor metrics. |
+
+---
+
+## Safety & Compatibility
+
+*  **HTTPS Required**: Accurate IP & country detection.
+*  **CORS Protected**: Only registered domains can send data.
+*  **Protect Your API Key**: Don't expose it publicly.
+*  **Legacy Support**: Older scripts still function (limited metrics).
+
+---
+
+##  Quick Summary
+
+| Step       | Action                                                    |
+| ---------- | --------------------------------------------------------- |
+| ✅ Register | `POST /api/sites` to get your `api_key` and script        |
+| ✅ Embed    | Add `<script>` tag site-wide                              |
+| ✅ Track    | Auto-collects page views, clicks, durations, and visitors |
+| ✅ Analyze  | Fetch via `GET /api/analytics?api_key=...`                |
+| ✅ Upgrade  | Switch to `/api/tracker.js` for new visitor metrics       |
+
+---
+
+##  Upgrade Notice for Existing Users
+
+> If you're using the old `/api/process.js`, it still works.
+
+To enable **visitor insights**:
+
+```html
+<script src="https://analytics.essentialnews.ng/api/tracker.js?api_key=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></script>
+```
+
+
+
+---
+
+## 🛠️ Technical Stack
+
+* **Backend**: Laravel, MySQL
+*  **Jobs**: Queued background event processing
+*  **Storage**: `session_id`, `ip_address`, timestamps
+*  **Client Script**: Pure JavaScript, no dependencies
+*  **Performance**: Indexing & optimized queries
+
+---
+
+## 🙋 Need Help?
+
+ Email: [webmasterjdd@gmail.com](mailto:webmasterjdd@gmail.com)
+ Found a bug? [Open an issue](https://github.com/hardeex/website-tracker-analytics/issues)
+
+> Made with ❤️ using Laravel & JavaScript, focused on **developer happiness** and **simplicity**.
+
+---
+
 
