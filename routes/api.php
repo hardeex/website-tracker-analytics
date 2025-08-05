@@ -5,6 +5,7 @@ use App\Http\Controllers\API\AnalyticsController;
 
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\TrackingController;
+use App\Http\Controllers\DisplayAnalyticsData;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +49,10 @@ Route::middleware(['throttle:1000,1'])->group(function () {
     Route::post('/track', [TrackingController::class, 'trackEvent'])->name('track.event');
     Route::get('/analytics', [TrackingController::class, 'getAnalytics'])->name('analytics.get');
     Route::get('/script.js', [TrackingController::class, 'getTrackingScript'])->name('tracker.script');
+
+    // handle the display of the data
+    Route::post('/track/dynamic', [DisplayAnalyticsData::class, 'trackDynamicEvent'])->name('track.dynamic');
+    Route::get('/dashboard', [DisplayAnalyticsData::class, 'showAnalyticsDashboard'])->name('analytics.dashboard');
 });
 
 

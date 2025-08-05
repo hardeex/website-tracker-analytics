@@ -17,6 +17,8 @@ class Analytic extends Model
         'user_agent',
         'country',
         'city',
-        'session_duration',
+        'session_duration',    
+        'session_id',
+        'custom_data',
     ];
 }

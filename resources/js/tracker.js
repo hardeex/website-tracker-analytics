@@ -1,5 +1,6 @@
 (function() {
     document.addEventListener('DOMContentLoaded', function() {
+        // Generate or retrieve session ID
         let sessionId = localStorage.getItem('tracker_session_id');
         if (!sessionId) {
             sessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -9,11 +10,13 @@
             localStorage.setItem('tracker_session_id', sessionId);
         }
 
+        // Tracker object for sending events
         var tracker = {
-            track: function(eventType, data) {
+            track: function(eventType, data = {}, customData = {}) {
                 console.debug('Tracking event:', {
                     eventType,
                     data,
+                    customData,
                     page_url: window.location.href,
                     api_key: '{{API_KEY}}',
                     session_id: sessionId,
@@ -28,7 +31,8 @@
                         page_url: window.location.href,
                         user_agent: navigator.userAgent,
                         session_id: sessionId,
-                        ...data
+                        ...data,
+                        custom_data: customData
                     })
                 })
                 .then(response => {
@@ -42,16 +46,25 @@
             }
         };
 
+        // Track initial page view
         tracker.track('pageview', {});
+
+        // Track session duration on page unload
         var startTime = Date.now();
         window.addEventListener('beforeunload', function() {
             var duration = Math.round((Date.now() - startTime) / 1000);
             tracker.track('pageview', { session_duration: duration });
         });
 
+        // Track click events
         document.addEventListener('click', function(e) {
             var elementId = e.target.id || null;
             tracker.track('click', { element_id: elementId });
         });
+
+        // Periodically send heartbeat to track online status (every 30 seconds)
+        setInterval(function() {
+            tracker.track('heartbeat', {});
+        }, 30000);
     });
 })();

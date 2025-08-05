@@ -12,9 +12,9 @@
                 <a href="#features" class="hover:text-purple-300 transition-colors duration-300">Features</a>
                 <a href="#pricing" class="hover:text-purple-300 transition-colors duration-300">Pricing</a>
                 <a href="#docs" class="hover:text-purple-300 transition-colors duration-300">Documentation</a>
-                <button class="bg-gradient-to-r from-purple-600 to-cyan-600 px-6 py-2 rounded-full hover:from-purple-700 hover:to-cyan-700 transition-all duration-300 transform hover:scale-105">
-                    Get Started
-                </button>
+                <a href="{{route('analytics.dashboard')}}" class="bg-gradient-to-r from-purple-600 to-cyan-600 px-6 py-2 rounded-full hover:from-purple-700 hover:to-cyan-700 transition-all duration-300 transform hover:scale-105">
+                    Dashboard
+                </a>
             </div>
         </div>
     </nav>
